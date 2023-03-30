@@ -29,7 +29,10 @@ router.get("/new-post", async function (req, res) {
 
 router.post("/posts", async function (req, res) {
   const authorId = new ObjectId(req.body.author);
-  const author = await db.getDb().collection("authors").findOne({ _id: authorId });
+  const author = await db
+    .getDb()
+    .collection("authors")
+    .findOne({ _id: authorId });
 
   const newPost = {
     title: req.body.title,
@@ -53,23 +56,62 @@ router.get("/posts/:id", async function (req, res) {
   const post = await db
     .getDb()
     .collection("posts")
-    .findOne({ _id: new ObjectId(postId) }, { summary: 0 })
+    .findOne({ _id: new ObjectId(postId) }, { summary: 0 });
 
   if (!post) {
     return res.status(404).render("404");
   }
 
-  res.render('post-detail', { post: post });
+  post.humanReadableDate = post.date.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  post.date = post.date.toISOString();
+
+  res.render("post-detail", { post: post });
 });
 
 router.post("/posts/:id/delete", async function (req, res) {
   const postId = new ObjectId(req.params.id);
+  const post = await db.getDb().collection("posts").deleteOne({ _id: postId });
+
+  if (!post) {
+    return res.status(404).render("404");
+  }
+
+  res.redirect("/posts");
+});
+
+router.get("/posts/:id/edit", async function (req, res) {
+  const postId = req.params.id;
   const post = await db
     .getDb()
     .collection("posts")
-    .deleteOne({_id: postId});
+    .findOne({ _id: new ObjectId(postId) }, { title: 1, summary: 1, body: 1 });
 
-    res.redirect('/posts');
+  res.render("update-post", { post: post });
+});
+
+router.post("/posts/:id/edit", async function (req, res) {
+  const postId = new ObjectId(req.params.id);
+  const post = await db
+    .getDb()
+    .collection("posts")
+    .updateOne(
+      { _id: postId },
+      {
+        $set: {
+          title: req.body.title,
+          summary: req.body.summary,
+          body: req.body.content,
+        },
+      }
+    );
+
+  res.redirect("/posts");
 });
 
 module.exports = router;
